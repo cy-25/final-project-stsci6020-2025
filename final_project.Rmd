@@ -1,0 +1,402 @@
+---
+title: "Final Project Analysis"
+author: "Caroline Yates"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+  pdf_document:
+    toc: true
+---
+
+# Introduction
+
+This data set comes from Kaggle (https://www.kaggle.com/datasets/fedesoriano/body-fat-prediction-dataset). It contains observations of 15 variables from 252 men that include different body measurements. Body fat measurements can be imprecise and there has been a history of different mathematical formulas that have been used to calculate body fat. 
+
+The objective of this report is to measure the association of multiple body measurements with body fat. Through this, it may be possible to develop a tool to calculate body fat using the most appropriate body measurements to avoid time consuming processes and repeated measurements of for an individual. 
+
+# Methods
+
+## Data Description
+
+```{r warning=FALSE}
+#load packages
+library(tidyverse)
+library(skimr)
+library(lmtest)
+library(car)
+
+
+#Read in data
+
+read.csv("bodyfat.csv") -> body_data
+```
+
+
+## Analysis
+
+### Exploratory Data Analysis
+
+This data set is already in a format that is prepared for analysis, so there is minimal cleaning or data processing needed. We will begin by examining the data and performing initial data visualization. 
+
+```{r}
+#Summary of variables
+skim(body_data)
+```
+
+The data in this are very complete and there are no missing values for any of the variables. The table above includes useful summary statistics including the mean, standard deviation (sd), and quartiles for each variable. 
+
+
+It is also important to visualize the distributions and relationships within this data:
+
+#### Visualization of Variables:
+
+- Density: 
+
+```{r}
+hist(body_data$Density, main = "Histogram of Density", xlab = "Density")
+boxplot(body_data$Density)
+```
+
+
+- Body Fat:  
+
+```{r}
+hist(body_data$BodyFat, main = "Histogram of Body Fat", xlab = "Body Fat")
+boxplot(body_data$BodyFat)
+```
+
+
+- Age: 
+
+```{r}
+hist(body_data$Age, main = "Histogram of Age", xlab = "Age")
+boxplot(body_data$Age)
+```
+
+
+- Weight: 
+
+```{r}
+hist(body_data$Weight, main = "Histogram of Weight", xlab = "Weight")
+boxplot(body_data$Weight)
+```
+
+
+- Height: 
+
+```{r}
+hist(body_data$Height, main = "Histogram of Height", xlab = "Height")
+boxplot(body_data$Height)
+```
+
+
+- Neck: 
+
+```{r}
+hist(body_data$Neck, main = "Histogram of Neck", xlab = "Neck")
+boxplot(body_data$Neck)
+```
+
+
+- Chest: 
+
+```{r}
+hist(body_data$Chest, main = "Histogram of Chest", xlab = "Chest")
+boxplot(body_data$Chest)
+```
+
+
+- Abdomen: 
+
+```{r}
+hist(body_data$Abdomen, main = "Histogram of Abdomen", xlab = "Abdomen")
+boxplot(body_data$Abdomen)
+```
+
+
+- Hip: 
+
+```{r}
+hist(body_data$Hip, main = "Histogram of Hip", xlab = "Hip")
+boxplot(body_data$Hip)
+```
+
+
+- Thigh:
+
+```{r}
+hist(body_data$Thigh, main = "Histogram of Thigh", xlab = "Thigh")
+boxplot(body_data$Thigh)
+```
+
+
+- Knee:
+
+```{r}
+hist(body_data$Knee, main = "Histogram of Knee", xlab = "Knee")
+boxplot(body_data$Knee)
+```
+
+
+- Ankle:
+
+```{r}
+hist(body_data$Ankle, main = "Histogram of Ankle", xlab = "Ankle")
+boxplot(body_data$Ankle)
+```
+
+
+- Biceps:
+
+```{r}
+hist(body_data$Biceps, main = "Histogram of Biceps", xlab = "Biceps")
+boxplot(body_data$Biceps)
+```
+
+
+- Forearm:
+
+```{r}
+hist(body_data$Forearm, main = "Histogram of Forearm", xlab = "Forearm")
+boxplot(body_data$Forearm)
+```
+
+
+- Wrist:
+
+```{r}
+hist(body_data$Wrist, main = "Histogram of Wrist", xlab = "Wrist")
+boxplot(body_data$Wrist)
+```
+
+
+From these visualizations, we can begin to look at the distributions of each of these variables and determine if there are any outliers. Generally, outliers appear for the following variables: Neck, Weight, Height, Hip, and Thigh. However, none of them appear to be too extreme, so we will use all 252 observations and continue in our analysis. 
+
+### Creating the model
+
+We will begin with a model that contains all our variables of interest for this analysis: Density, Age, Height, Abdomen, Wrist and Ankle. 
+
+```{r}
+lm(BodyFat ~ Density + Age +Height + Weight + Abdomen + Wrist + Ankle,
+   data = body_data) -> mod
+summary(mod)
+```
+
+### Regression Assumption Verification
+
+Now that we have a model to consider further, let's check that the assumptions of linearity hold for our model.
+
+1. Linear relationship: 
+
+```{r}
+plot(mod$fitted.values, body_data$BodyFat, 
+     xlab = "Fitted values", ylab = "Observed values")
+abline(a = 0, b = 1, col = "blue")
+```
+The plot of the fitted values vs observed values indicates that the linearity assumption largely holds for our model. The points generally fall along the line and do not have a strong non-linear relationship. 
+
+2. Homoskedasticity:
+
+```{r}
+plot(mod$fitted.values, mod$residuals,xlab = "Fitted values", ylab = "Residuals")
+```
+
+This visualization shows that the homoskedascity assumption could generally hold, but we can use the Beush-Pagan test to confirm this.
+
+```{r}
+#Breusch-Pagan Test
+bp_test <- bptest(mod)
+bp_test
+```
+
+The Breusch-Pagan test uses the null hypothesis that there is homoskedasticity present. Since the p-value of 0.001002 is below our level of significance of 0.05, we conclude that there is heteroskedasiticity present. This means we will need to consider using robust inference with sandwhich estimators. 
+
+
+3. Independence of errors: This data consists of several different measurements of 252 people. Biologically, there many be some dependence across variables. However, the data does not contain repeated measurements from them same individual over time, instead each variable was measured a single time for each person. Overall, it is important to be aware in our analysis that there many be some level of biological association between the variables included in our analysis but the independence of errors assumption generally holds since there are no repeated measurements and there is no clustering within the data. 
+
+4. Normality of Residuals
+```{r}
+shapiro.test(resid(mod))
+
+plot(mod)
+qqnorm(rstandard(mod))
+```
+
+These tests and visualizations indicate that the residuals are not normally distributed. The heavy tailed qqplot suggests that there is more data at the extreme values. There are 252 data points in our data set, so it the impact of this is not as large as it would be for a smaller data set. While important to consider, the normality of errors assumption is more important for inference than point estimates and so we will continue on to evaluate the remaining assumptions. 
+
+5. Multicollinearity
+
+```{r}
+vif(mod)
+```
+
+The Variance Inflation Factor (VIF) test indicates that that the VIF value for Density and Wrist are fairly high while the VIF for Abdomen is very high. Since Abdomen is so high, we will remove it as a variable and run our test again. 
+
+
+### Assumption Violation Handling
+
+- Multicollinearity: Remove Abdomen from the model due to its high VIF and assess multicollinearity for our new model.
+
+```{r}
+lm(BodyFat ~ Density + Age +Height + Weight + Wrist + Ankle,
+   data = body_data) -> mod2
+summary(mod2)
+vif(mod2)
+```
+Now, we can see that while Weight has a higher VIF, the other variables do not. We can continue to include Weight in the model but as a control variable due to the multicollinearity present. Moving forward, we will now use the model that does not include Abdomen. 
+
+- Hetroskedascitity: Heteroskedasticity can lead to incorrect p-values and confidence intervals. To address this violation of the homoskedasticity assumption, we will use robust standard errors for our analysis below.  
+
+
+### Variable Selection and Hypothesis Testing
+
+#### Model Selection
+
+When creating our model, we must consider the bias-variance trade-off. Including more predictors may decrease our bias but it will increase our variance. To determine which variables to keep in our model, we will perform stepwise selection with forward and backwards selection with BIC.  
+
+
+```{r}
+#start with smallest model
+intOnly <- lm(BodyFat~ 1, data = body_data)
+
+#biggest model
+mod_big <- lm(BodyFat ~ ., data = body_data)
+
+#use step function for forward selection: will read AIC but use K argument for BIC output
+
+out_forward_bic <- step(object = intOnly, direction = "forward", 
+                        scope = formula(mod_big), trace = T, k = log(nrow(body_data)))
+
+#use step function for backward selection: will read AIC but use K argument for BIC output
+out_backward_bic <- step(object = mod_big, direction = "backward",
+                         scope = formula(mod_big), trace = T, k = log(nrow(body_data)))
+
+
+```
+
+The forward selection method would lead us to choose a model that includes Abdomen, which our above multicollinearity analysis have shown should be excluded.Since we are able to build the full model with all our initial variables of interest and we know from the literature that many of these variables are involved in body fat measurements, we will prefer to use backwards selection with BIC.
+
+Following model selection we will use the model chosen from the backwards selection method:  
+
+```{r}
+lm(BodyFat ~ Density + Chest, data = body_data) -> mod_back
+summary(mod_back) 
+```
+
+
+#### Evaluate significance of each variable in the model: 
+The acceptable level of significance for our analysis is: alpha = 0.05
+
+We will use the $H_0$: there is no association ($b = 0$) and the alternative hypothesis $H_a$: there is an association ($b \neq 0$).
+
+ 
+```{r}
+summary(mod_back)
+p_adj <- p.adjust(c(2e-16, 6.64e-05), method = "bonferroni")
+p_adj
+```
+We can use the summary() function to find the t statistic for each variable in our model. We can then use the Bonferroni procedure to account for multiple testing. This is an overly conservative procedure, so it may come with a loss of power. We find that both our unadjusted and adjusted p-values are below our significance level of 0.05, so we can reject the null hypothesis of no association and conclude that there is an association present for the variables we included in our model. 
+
+#### Model Performance Techniques 
+
+```{r}
+summary(mod_back)$r.squared
+summary(mod_back)$adj.r.squared
+```
+The $R^2$ value measures how well our model fits the training data. However, it is known that the $R^2$ value increaes with more predictors, which may lead to an overly complex model. This is why we can also evaluate the Adjusted $R^2$ measure. This penalizes for model complexity. Though the adjusted $R^2$ penalty may be weak, it will work for our model since it is not too complex and contains 2 predictors. From the summary() output for our model chosen with backwards selection with BIC, we can see that the $R^2$ and Adjusted $R^2$ value are both very similiar. They are both very high, which may be a sign that our model overfits the training data. 
+
+#### Cross Validation Techniques
+
+We will perform cross validation using data splitting: We will split the data where 70% is for training and 30% is for testing. 
+
+```{r}
+set.seed(1)
+
+body_data %>% 
+  mutate(id = row_number(), .before = Density) -> cross_val_data
+
+n <- dim(cross_val_data)[1]
+
+m <- floor(n*0.7)
+
+train_idx <- sample(1:n, m, replace = FALSE)
+
+train_set <- cross_val_data[train_idx,]
+
+test_set <- cross_val_data[-train_idx,]
+
+y_true <- test_set$Density
+
+#model with training data:
+mod_a <- lm(BodyFat ~ Density + Chest, data = test_set)
+summary(mod_a)
+
+#Test set
+y_hat_1 <- predict(mod_a, test_set)
+
+#Calculate Mean Squared Error
+
+pred_error_1 <- mean((y_hat_1 - y_true)^2)
+pred_error_1
+
+
+mod_b <- lm(BodyFat ~ Density + Chest + Age, data = train_set)
+summary(mod_b)
+
+y_hat_2 <- predict(mod_b, test_set)
+pred_error_2 <- mean((y_hat_2 - y_true)^2)
+pred_error_2
+
+```
+
+
+From our cross validation, it looks like we may be able to slightly decrease our MSE when adding other variables like Age. However, the above linearity assumptions and model selection would lead us to favor the simplier model selected above, especially since the MSE difference is not very large.  
+
+
+#### Feature Impact Analysis
+
+For the significant coefficients, we will generate confidence intervals using the sandwhich estimator to account for the robust error method due to the heteroskedasticity. 
+
+
+```{r}
+coefci(mod_back, vcov. = sandwich::vcovHC(mod_back), type = "HC3")
+
+```
+
+
+Practically, the selection of Density and Chest for inclusion in our model could represent variables that would be useful for measurement of Body Fat in the future, as compared to the many variables observed in the data set. 
+
+
+# Results
+
+```{r}
+lm(BodyFat ~ Density + Chest, data = body_data) -> mod_back
+summary(mod_back)
+```
+
+
+From our analysis, we have found that our model contains 2 significant variables. Density and Chest measurements have an association with Body Fat. 
+
+Using our model, we can say that:
+
+Given two observations whose Density measurements differ by 1 unit when all other measures are constant, we would expect the observation with the larger Density value to have a Body Fat that is -418.41989 units smaller than the observation with the smaller Density. 
+
+Given two observations whose Chest measurements differ by 1 unit when all other measurements are constant, we would expect the observation with the larger Chest value to have a Body Fat that is 0.05272 units larger than the observation with the smaller Chest measurement. 
+
+# Discussion
+
+This work gives explores the association of multiple body measurements with body fat and finds that 2 measurements (Density and Chest) are significantly associated with body fat. There are several limitations to this model, such as the violation of multicollinearity and homoskedasticity assumptions that have been addressed in this analysis. The model that was generated in this process would benefit from additional observations in continued analyses. Overall, this work indicated that a model with 2 of the several measurements taken could be used to understand the association bewteen Body Fat and body measurements. 
+
+# Conclusion
+
+This analysis began with a data set with 15 body measurements for 252 men and used linear regression to explore the association of body fat with several variables. Density and Chest were found to be significantly associated with Body Fat. Future work could explore more variables for inclusion or potential improvements to the prediction with the model. This would benefit future Body Fat analyses. 
+
+
+# References:
+
+1. Slides, Labs, and Assignments for BTRY 6020
+
+2. https://library.virginia.edu/data/articles/understanding-q-q-plots#:~:text=A%20QQ%20plot%20is%20a,a%20line%20that's%20roughly%20straight.
